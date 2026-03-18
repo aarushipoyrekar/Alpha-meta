@@ -1,0 +1,58 @@
+library(ggplot2)
+library(ggrepel)
+
+#READ DATA
+expr <- read.table("RSEM.isoform.TMM.EXPR.matrix", 
+                   header = TRUE, row.names = 1, check.names = FALSE)
+#LOG TRANSFORM
+expr_log <- log2(expr + 1)
+#REMOVE ZERO VARIANCE GENES
+expr_log <- expr_log[apply(expr_log, 1, var) > 0, ]
+#TRANSPOSE (SAMPLES AS ROWS)
+expr_t <- t(expr_log)
+#RUN PCA
+pca <- prcomp(expr_t, scale = TRUE)
+#VARIANCE EXPLAINED
+summary(pca)
+var_explained <- summary(pca)$importance[2,]
+var_explained
+#SCREE PLOT
+scree_df <- data.frame(PC = 1:length(var_explained), variance = var_explained)
+scree_df
+ggplot(scree_df, aes(x = PC, y = variance)) +
+  geom_line(linewidth = 1) + geom_point(size = 3) + 
+  ylab("Percentage of Variance Explained") + ggtitle("Scree Plot") +
+  theme_minimal() + theme(text = element_text(size = 14))
+
+#SCORE PLOT
+pca_df <- data.frame(pca$x)
+pca_df
+ggplot(pca_df, aes(x = PC1, y = PC2, label = rownames(pca_df))) +
+  geom_point(size = 4) + geom_text(vjust= -0.7) + 
+  xlab(paste0("PC1 (", round(var_explained[1]*100,2),"%")) + 
+  ylab(paste0("PC2 (", round(var_explained[2]*100,2), "%")) +
+  ggtitle("PCA Score Plot") + 
+  theme_minimal() + theme(text = element_text(size=14))
+#NUMBER OF TOP GENES YOU WANT TO LABEL
+N <- 20
+#CONVERT LOADINGS TO DATAFRAME
+pca
+loadings <- as.data.frame(pca$rotation)
+loadings$gene <- rownames(loadings)
+loadings
+#SELECT TOP GENES BY ABS PC1 LOADING
+top_genes <- loadings[order(abs(loadings$PC1), decreasing = TRUE), ][1:N, ]
+#MARK  THEM FOR HIGHLIGHTING
+loadings$highlight <- ifelse(loadings$gene %in% top_genes$gene, "Top", "Other")
+
+#LOADING PLOT
+ggplot(loadings, aes(x = PC1, y = PC2)) + 
+  geom_point(aes(color = highlight), alpha = 0.6) +
+  scale_color_manual(values = c("grey80", "red")) +
+  geom_text_repel(data = subset(loadings, highlight == "Top"),
+                  aes(label = gene), size = 3, max.overlaps = Inf) +
+  theme_minimal() + 
+  labs(title = "PCA loading plot (top genes highlighted", x = "PC1 Loadings", y = "PC2 Loadings") +
+  theme(legend.position = "none")
+  
+scree <- data.frame(PC = 1:nrow(var_explained))
