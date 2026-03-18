@@ -23,3 +23,57 @@ ggplot(plot_frame, aes(x = treatment, y = expression)) +
   labs(title = "Linear Regression", x = "Treatment", y = "Fold Change") + 
   theme_classic()
 boxplot(expr ~ metadata$treatment, ylab = "log2(Expression + 1)", main = gene)
+
+_________________________________________________________________________________________________________________
+# Load libraries
+library(gplots)
+library(ggplot2)
+
+# Read RNA matrix
+data <- read.table("RNAmatrix.tsv", header = TRUE, row.names = 1, sep = "\t")
+
+# Metadata
+metadata <- data.frame(
+  sample    = colnames(data),
+  treatment = c(rep("PBS", 4), rep("Ecoli", 4)),
+  age       = c(rep("Adult", 8), rep("Juvi", 8))
+)
+
+# Convert to factors and set reference levels
+metadata$treatment <- factor(metadata$treatment)
+metadata$treatment <- relevel(metadata$treatment, ref = "PBS")
+
+metadata$age <- factor(metadata$age)
+metadata$age <- relevel(metadata$age, ref = "Adult")
+
+# Choose gene
+gene <- "Sox17"
+
+# Expression values (log2 transformed)
+expr <- as.numeric(log2(data[gene, ] + 1))
+
+# Multiple regression model
+model <- lm(expr ~ treatment + age, data = metadata)
+summary(model)
+
+# Plotting frame
+plot_frame <- data.frame(
+  expression = expr,
+  treatment  = metadata$treatment,
+  age        = metadata$age
+)
+
+# ggplot visualization
+ggplot(plot_frame, aes(x = treatment, y = expression, color = age, group = age)) +
+  geom_jitter(width = 0.1, size = 3) +
+  stat_summary(fun = "mean", geom = "line") +
+  stat_summary(fun = "mean", geom = "point") +
+  labs(title = paste("Multiple Regression for", gene),
+       x = "Treatment", y = "log2(Expression + 1)", color = "Age") +
+  theme_classic()
+
+# Base R boxplot with combined factor
+metadata$group <- interaction(metadata$treatment, metadata$age, sep = "_")
+boxplot(expr ~ metadata$group,
+        ylab = "log2(Expression + 1)",
+        main = gene)
