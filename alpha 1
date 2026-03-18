@@ -1,0 +1,86 @@
+#1. Load the required packages
+library(vegan)
+library(phyloseq)
+library(tidyverse)
+library(patchwork)
+library(agricolae)
+library(FSA)
+library(rcompanion)
+
+#2. Indices calculation
+data_richness <- estimateR(data_otu)                                            # calculate richness and Chao1 using vegan package
+data_evenness <- diversity(data_otu) / log(specnumber(data_otu))                # calculate evenness index using vegan package
+data_shannon <- diversity(data_otu, index = "shannon")                          # calculate Shannon index using vegan package
+data_alphadiv <- cbind(data_grp, t(data_richness), data_shannon, data_evenness) # combine all indices in one data table
+rm(data_richness, data_evenness, data_shannon)                                  # remove the unnecessary data/vector
+
+data_alphadiv_tidy <- 
+  data_alphadiv %>%
+  mutate(sample_id = rownames(data_alphadiv)) %>%
+  gather(key   = alphadiv_index,
+         value = obs_values,
+         -sample_id, -site, -month, -site_month)
+
+head(data_alphadiv_tidy)
+
+#3. Visualization  
+P1 <- ggplot(data_alphadiv, aes(x=site, y=S.obs)) +
+  geom_boxplot(fill=c("blue","red")) +
+  labs(title= 'Richness', x= ' ', y= '', tag = "A") +
+  geom_point()
+
+P2 <- ggplot(data_alphadiv, aes(x=site, y=S.chao1)) +
+  geom_boxplot(fill=c("blue","red")) +
+  labs(title= 'Chao1', x= ' ', y= '', tag = "B") +
+  geom_point()
+
+P3 <- ggplot(data_alphadiv, aes(x=site, y=data_evenness)) +
+  geom_boxplot(fill=c("blue","red")) +
+  labs(title= 'Evenness', x= ' ', y= '', tag = "C") +
+  geom_point()
+
+P4 <- ggplot(data_alphadiv, aes(x=site, y=data_shannon)) +
+  geom_boxplot(fill=c("blue","red")) +
+  labs(title= 'Shannon', x= ' ', y= '', tag = "D") +
+  geom_point()
+
+# all plots together using the patchwork package
+(P1 | P2) / (P3 | P4)
+
+#4. Richness Plot
+data_alphadiv_tidy %>%  
+  filter(alphadiv_index == "S.obs") %>%  
+  # fct_relevel() in forecats package to rearrange the sites and months as we want (chronologic)  
+  mutate(month = fct_relevel(month, "July", "August", "September")) %>%  
+  ggplot(., aes(x = month, y = obs_values)) +  
+  geom_boxplot(aes(fill = month)) +  
+  geom_point() +  
+  facet_grid(. ~ site) +  
+  labs(y = "Richness", x = "") +  
+  # x axis label reoriented for better readability  
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  
+
+#5. Statistical analysis
+# Parametric tests - Shanon index using one-factor ANOVA test
+# test the effect of the sampling site on the Shannon index using one-factor ANOVA test
+summary(aov(data_shannon ~ site, data = data_alphadiv))
+
+# Test the effect of the sampling date on the Shannon index using a one-factor ANOVA test
+aov_test <- aov(data_shannon ~ month, data = data_alphadiv)  
+summary(aov_test)
+
+#Tukey Honest Significant Difference test to test differences among the sampling dates.
+# post-hoc test
+hsd_test <- TukeyHSD(aov_test) # require the agricolae package  
+hsd_res <- HSD.test(aov_test, "month", group=T)$groups  
+hsd_res  
+
+# Parametric tests - Shannon index using two-factor ANOVA tests(sampling site & sampling date)
+summary(aov(data_shannon ~ site * month, data = data_alphadiv))
+
+# Non-parametric tests - Kruskal-Wallis and a Dunn test
+kruskal.test(data_shannon ~ site, data = data_alphadiv)
+kruskal.test(data_shannon ~ month, data = data_alphadiv)    
+PT <- dunnTest(data_shannon ~ month, data = data_alphadiv, method="bh") # require the FSA package     
+PT2 <- PT$res  
+cldList(comparison = PT2$Comparison, p.value = PT2$P.adj, threshold  = 0.05) # require the rcompanion package   
