@@ -1,0 +1,30 @@
+install.packages("rlang") 
+if(!requireNamespace("BiocManager", quietly = TRUE)) 
+  install.packages("BiocManager") 
+BiocMAnager::install("RCy3") 
+BiocManager::install("RCy3", force = TRUE) 
+
+library(RCy3) 
+
+#NODE 
+nodes <- data.frame(id = c("A", "B", "C", "D", "E"), stringsAsFactors = FALSE) 
+nodes 
+
+#EDGES 
+edges <- data.frame(source = c("A", "A", "B", "C", "D"), 
+                    target = c("B", "C", "C", "D", "E"), 
+                    stringsAsFactors = FALSE) 
+edges 
+
+#NETWORK 
+createNetworkFromDataFrames(nodes = nodes, edges = edges, 
+                            title = "My First Network", 
+                            collection = "Omics Visualization") 
+
+#DEGREE 
+deg <- table(c(edges$source, edges$target)) 
+deg 
+deg_df <- data.frame(id = names(deg), degree = as.numeric(deg)) 
+deg_df 
+
+loadTableData(deg_df, data.key.column = "id", table = "node") 
