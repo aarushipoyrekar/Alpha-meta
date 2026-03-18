@@ -1,0 +1,25 @@
+library(gplots)
+library(ggplot2)
+data = read.table("RNAmatrix.tsv", header = TRUE, row.names = 1, sep = "\t")
+metadata <- data.frame(sample = colnames(data), 
+                       treatment = c(rep("PBS", 4), rep("Ecoli", 4)))
+metadata
+
+#for good practice 
+metadata$treatment <- factor(metadata$treatment)
+metadata$treatment <- relevel(metadata$treatment, ref = "PBS")
+levels(metadata$treatment)
+
+gene <- "Clk1"
+#lm function needs numeric vals, very sensitive
+expr <- as.numeric(log2(data[gene, ] + 1))
+model <- lm(expr ~ treatment, data = metadata)
+summary(model)
+
+plot_frame <- data.frame(expression = expr, treatment = factor(metadata$treatment))
+ggplot(plot_frame, aes(x = treatment, y = expression)) + 
+  geom_jitter(width=0.1, size = 3) + 
+  stat_summary(fun = "mean", geom = "line", aes(group = 1), color = "pink") + 
+  labs(title = "Linear Regression", x = "Treatment", y = "Fold Change") + 
+  theme_classic()
+boxplot(expr ~ metadata$treatment, ylab = "log2(Expression + 1)", main = gene)
